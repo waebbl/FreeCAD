@@ -29,6 +29,7 @@ __url__ = "https://www.freecadweb.org"
 #  @{
 
 import os
+from os.path import join
 
 import FreeCAD
 
@@ -129,16 +130,127 @@ class FemInputWriter():
 
     # ********************************************************************************************
     # ********************************************************************************************
+    # generic writer for constraints mesh sets and constraints property data
+    # write constraint node sets, constraint face sets, constraint element sets
+    def write_constraints_meshsets(
+        self,
+        f,
+        femobjs,
+        con_module
+    ):
+        if not femobjs:
+            return
+
+        analysis_types = con_module.get_analysis_types()
+        if analysis_types != "all" and self.analysis_type not in analysis_types:
+            return
+
+        def constraint_sets_loop_writing(the_file, femobjs, write_before, write_after):
+            if write_before != "":
+                f.write(write_before)
+            for femobj in femobjs:
+                # femobj --> dict, FreeCAD document object is femobj["Object"]
+                the_obj = femobj["Object"]
+                f.write("** {}\n".format(the_obj.Label))
+                con_module.write_meshdata_constraint(the_file, femobj, the_obj, self)
+            if write_after != "":
+                f.write(write_after)
+
+        write_before = con_module.get_before_write_meshdata_constraint()
+        write_after = con_module.get_after_write_meshdata_constraint()
+
+        # write sets to file
+        write_name = con_module.get_sets_name()
+        f.write("\n{}\n".format(59 * "*"))
+        f.write("** {}\n".format(write_name.replace("_", " ")))
+
+        if self.split_inpfile is True:
+            file_name_split = "{}_{}.inp".format(self.mesh_name, write_name)
+            f.write("** {}\n".format(write_name.replace("_", " ")))
+            f.write("*INCLUDE,INPUT={}\n".format(file_name_split))
+            inpfile_split = open(join(self.dir_name, file_name_split), "w")
+            constraint_sets_loop_writing(inpfile_split, femobjs, write_before, write_after)
+            inpfile_split.close()
+        else:
+            constraint_sets_loop_writing(f, femobjs, write_before, write_after)
+
+    # write constraint property data
+    def write_constraints_propdata(
+        self,
+        f,
+        femobjs,
+        con_module
+    ):
+
+        if not femobjs:
+            return
+
+        analysis_types = con_module.get_analysis_types()
+        if analysis_types != "all" and self.analysis_type not in analysis_types:
+            return
+
+        write_before = con_module.get_before_write_constraint()
+        write_after = con_module.get_after_write_constraint()
+
+        # write constraint to file
+        f.write("\n{}\n".format(59 * "*"))
+        f.write("** {}\n".format(con_module.get_constraint_title()))
+        if write_before != "":
+            f.write(write_before)
+        for femobj in femobjs:
+            # femobj --> dict, FreeCAD document object is femobj["Object"]
+            the_obj = femobj["Object"]
+            f.write("** {}\n".format(the_obj.Label))
+            con_module.write_constraint(f, femobj, the_obj, self)
+        if write_after != "":
+            f.write(write_after)
+
+    # ********************************************************************************************
+    # ********************************************************************************************
     # use set for node sets to be sure all nodes are unique
     # use sorted to be sure the order is the same on different runs
     # be aware a sorted set returns a list, because set are not sorted by default
     #     - done in return value of meshtools.get_femnodes_by_femobj_with_references
-    # TODO FIXME might be appropriate for element sets too
+    # TODO FIXME might be appropriate for element sets and surfaceface sets too
+
+    # ********************************************************************************************
+    # ********************************************************************************************
+    # get all known sets
+    def get_mesh_sets(self):
+        FreeCAD.Console.PrintMessage(
+            "Get mesh data for "
+            "node sets (groups), surface sets (groups) and element sets (groups)\n"
+        )
+
+        # materials and element geometry element sets getter
+        self.get_element_sets_material_and_femelement_geometry()
+
+        # constraints element sets getter
+        self.get_constraints_centrif_elements()
+
+        # constraints node sets getter
+        self.get_constraints_fixed_nodes()
+        self.get_constraints_displacement_nodes()
+        self.get_constraints_planerotation_nodes()
+
+        # constraints surface sets getter
+        self.get_constraints_contact_faces()
+        self.get_constraints_tie_faces()
+        self.get_constraints_sectionprint_faces()
+        self.get_constraints_transform_nodes()
+        self.get_constraints_temperature_nodes()
+
+        # constraints sets with constraint data
+        self.get_constraints_force_nodeloads()
+        self.get_constraints_pressure_faces()
+        self.get_constraints_heatflux_faces()
 
     # ********************************************************************************************
     # ********************************************************************************************
     # node sets
     def get_constraints_fixed_nodes(self):
+        if not self.fixed_objects:
+            return
         # get nodes
         for femobj in self.fixed_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
@@ -176,6 +288,8 @@ class FemInputWriter():
                 femobj["NodesFaceEdge"] = set(nds_faceedge)
 
     def get_constraints_displacement_nodes(self):
+        if not self.displacement_objects:
+            return
         # get nodes
         for femobj in self.displacement_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
@@ -189,6 +303,8 @@ class FemInputWriter():
                 self.constraint_conflict_nodes.append(node)
 
     def get_constraints_planerotation_nodes(self):
+        if not self.planerotation_objects:
+            return
         # get nodes
         for femobj in self.planerotation_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
@@ -199,6 +315,8 @@ class FemInputWriter():
             )
 
     def get_constraints_transform_nodes(self):
+        if not self.transform_objects:
+            return
         # get nodes
         for femobj in self.transform_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
@@ -209,6 +327,8 @@ class FemInputWriter():
             )
 
     def get_constraints_temperature_nodes(self):
+        if not self.temperature_objects:
+            return
         # get nodes
         for femobj in self.temperature_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
@@ -219,6 +339,8 @@ class FemInputWriter():
             )
 
     def get_constraints_fluidsection_nodes(self):
+        if not self.fluidsection_objects:
+            return
         # get nodes
         for femobj in self.fluidsection_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
@@ -229,6 +351,8 @@ class FemInputWriter():
             )
 
     def get_constraints_force_nodeloads(self):
+        if not self.force_objects:
+            return
         # check shape type of reference shape
         for femobj in self.force_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
@@ -295,6 +419,8 @@ class FemInputWriter():
     # ********************************************************************************************
     # faces sets
     def get_constraints_pressure_faces(self):
+        if not self.pressure_objects:
+            return
         # TODO see comments in get_constraints_force_nodeloads()
         # it applies here too. Mhh it applies to all constraints ...
 
@@ -337,6 +463,8 @@ class FemInputWriter():
             FreeCAD.Console.PrintLog("{}\n".format(femobj["PressureFaces"]))
 
     def get_constraints_contact_faces(self):
+        if not self.contact_objects:
+            return
         if not self.femnodes_mesh:
             self.femnodes_mesh = self.femmesh.Nodes
         if not self.femelement_table:
@@ -370,6 +498,8 @@ class FemInputWriter():
     #                from one side of the geometric face are needed
 
     def get_constraints_tie_faces(self):
+        if not self.tie_objects:
+            return
         if not self.femnodes_mesh:
             self.femnodes_mesh = self.femmesh.Nodes
         if not self.femelement_table:
@@ -396,8 +526,10 @@ class FemInputWriter():
             # FreeCAD.Console.PrintLog("{}\n".format(femobj["ContactMasterFaces"]))
 
     def get_constraints_sectionprint_faces(self):
+        if not self.sectionprint_objects:
+            return
         # TODO: use meshtools to get the surfaces
-        # see constraint contact or constrint tie
+        # see constraint contact or constraint tie
         for femobj in self.sectionprint_objects:
             # femobj --> dict, FreeCAD document object is femobj["Object"]
             sectionprint_obj = femobj["Object"]
@@ -431,14 +563,16 @@ class FemInputWriter():
                     else:
                         # in Gui only Faces can be added
                         FreeCAD.Console.PrintError(
-                            "Wrong reference shapt type for {} "
+                            "Wrong reference shape type for {} "
                             "Only Faces are allowed, but a {} was found.\n"
                             .format(sectionprint_obj.Name, ref_shape.ShapeType)
                         )
 
     def get_constraints_heatflux_faces(self):
+        if not self.heatflux_objects:
+            return
         # TODO: use meshtools to get the surfaces (or move to mesh tools)
-        # see constraint contact or constrint tie and constraint force
+        # see constraint contact or constraint tie and constraint force
         # heatflux_obj_face_table: see force_obj_node_load_table
         #     [
         #         ("refshape_name:elemname", face_table),
@@ -457,12 +591,13 @@ class FemInputWriter():
                         face_table = self.mesh_object.FemMesh.getccxVolumesByFace(ho)
                         femobj["HeatFluxFaceTable"].append((elem_info, face_table))
 
-
     # ********************************************************************************************
     # ********************************************************************************************
     # element sets constraints
     def get_constraints_centrif_elements(self):
         # get element ids and write them into the femobj
+        if not self.centrif_objects:
+            return
         if len(self.centrif_objects) == 1 and not self.centrif_objects[0]["Object"].References:
             self.centrif_objects[0]["FEMElements"] = self.ccx_evolumes
         else:
@@ -594,6 +729,8 @@ class FemInputWriter():
             )
 
     def get_element_sets_material_and_femelement_geometry(self):
+        if not self.material_objects:
+            return
         # in any case if we have beams, we're going to need the element ids for the rotation elsets
         if self.beamsection_objects:
             # we will need to split the beam even for one beamobj
@@ -994,7 +1131,7 @@ def get_ccx_elset_name_short(names):
     else:
         error = (
             "FEM: Trouble in ccx input file, because an"
-            "beam elset name is longer than 20 character! {}\n"
+            "beam elset name is longer than 20 characters! {}\n"
             .format(ccx_elset_name)
         )
         raise Exception(error)

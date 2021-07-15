@@ -187,6 +187,28 @@ SET(FemSolverCalculix_SRCS
     femsolver/calculix/__init__.py
     femsolver/calculix/solver.py
     femsolver/calculix/tasks.py
+    femsolver/calculix/write_constraint_centrif.py
+    femsolver/calculix/write_constraint_contact.py
+    femsolver/calculix/write_constraint_displacement.py
+    femsolver/calculix/write_constraint_fixed.py
+    femsolver/calculix/write_constraint_fluidsection.py
+    femsolver/calculix/write_constraint_force.py
+    femsolver/calculix/write_constraint_heatflux.py
+    femsolver/calculix/write_constraint_initialtemperature.py
+    femsolver/calculix/write_constraint_planerotation.py
+    femsolver/calculix/write_constraint_pressure.py
+    femsolver/calculix/write_constraint_sectionprint.py
+    femsolver/calculix/write_constraint_selfweight.py
+    femsolver/calculix/write_constraint_temperature.py
+    femsolver/calculix/write_constraint_tie.py
+    femsolver/calculix/write_constraint_transform.py
+    femsolver/calculix/write_femelement_geometry.py
+    femsolver/calculix/write_femelement_material.py
+    femsolver/calculix/write_femelement_matgeosets.py
+    femsolver/calculix/write_footer.py
+    femsolver/calculix/write_mesh.py
+    femsolver/calculix/write_step_equation.py
+    femsolver/calculix/write_step_output.py
     femsolver/calculix/writer.py
 )
 
